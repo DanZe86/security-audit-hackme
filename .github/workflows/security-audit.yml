@@ -119,7 +119,7 @@ jobs:
         run: docker load -i "${PROJECT_NAME}.tar"
 
       - name: Run Trivy and generate JSON report
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@0.36.0
         with:
           image-ref: "${{ env.PROJECT_NAME }}:${{ needs.prepare.outputs.image_tag }}"
           format: json
