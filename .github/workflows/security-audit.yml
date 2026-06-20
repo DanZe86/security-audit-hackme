@@ -66,7 +66,7 @@ jobs:
             -v "${{ github.workspace }}:/src" \
             -w /src \
             semgrep/semgrep:latest \
-            semgrep scan --config=auto --json --output /src/gl-sast-report.json /src
+            semgrep scan --config=auto --json --output /src/gl-sast-report.json /src || true
 
       - name: Show Semgrep report
         if: always()
@@ -78,6 +78,14 @@ jobs:
         with:
           name: semgrep-report
           path: gl-sast-report.json
+
+      - name: Fail on SAST findings
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}:/src" \
+            -w /src \
+            semgrep/semgrep:latest \
+            semgrep scan --config=auto /src
 
   sca:
     name: SCA - npm audit
@@ -118,10 +126,11 @@ jobs:
             npm-audit-client.json
 
       - name: Fail on high vulnerabilities
-        continue-on-error: true
         run: |
-          npm audit --audit-level=high
-          npm audit --audit-level=high --prefix client
+          FAILED=0
+          npm audit --audit-level=high || FAILED=1
+          (cd client && npm audit --audit-level=high) || FAILED=1
+          exit $FAILED
 
   build:
     name: Build image
@@ -130,6 +139,7 @@ jobs:
       - prepare
       - lint
       - sast
+    if: ${{ always() && needs.prepare.result == 'success' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -152,6 +162,7 @@ jobs:
     needs:
       - prepare
       - build
+    if: ${{ always() && needs.build.result == 'success' }}
     steps:
       - name: Download built image
         uses: actions/download-artifact@v4
@@ -230,7 +241,7 @@ jobs:
           target: 'http://127.0.0.1:3000'
           token: ${{ secrets.GITHUB_TOKEN }}
           allow_issue_writing: false
-          fail_action: false
+          fail_action: true
           artifact_name: zap-baseline-report
 
       - name: Stop application container
